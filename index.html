@@ -22,6 +22,8 @@ th,td{border:1px solid rgba(212,175,55,0.1);padding:8px;text-align:center;}
 th{background:#0f1113;color:#d4af37;}
 td{background:#0b0b0b;}
 .cards-list{font-size:13px;color:#bfc6c9;}
+.nav-btns{margin-top:10px;text-align:center;}
+.nav-btns button{margin:0 5px;}
 </style>
 </head>
 <body>
@@ -60,11 +62,16 @@ td{background:#0b0b0b;}
     <!-- data realtime dari Firebase -->
   </tbody>
 </table>
+<div class="nav-btns">
+  <button id="prevBtn" class="btn">Prev</button>
+  <span id="pageInfo" style="margin:0 10px;color:#d4af37;">1</span>
+  <button id="nextBtn" class="btn">Next</button>
+</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
@@ -88,8 +95,14 @@ const saveBtn = document.getElementById('saveBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const status = document.getElementById('status');
 const historyBody = document.getElementById('historyBody');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const pageInfo = document.getElementById('pageInfo');
 
 const OPTIONS = ["Platinum","Diamond","Super Diamond"];
+const ITEMS_PER_PAGE = 10;
+let historyData = [];
+let currentPage = 1;
 
 function buildGrid(){
   editGrid.innerHTML="";
@@ -107,82 +120,75 @@ function setStatus(txt,ok=true){
   status.style.color = ok?"#9aa0a6":"#ff6b6b";
 }
 
-async function saveToFirebase(){
-  setStatus("Menyimpan...");
-  const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
-  const code = codeInput.value || "1234";
-  try{
-    await set(dbRef,{code,cards});
-    setStatus("Tersimpan ✓");
-  }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
-}
-
-async function loadFromFirebase(){
-  setStatus("Memuat...");
-  try{
-    const snap = await get(dbRef);
-    if(snap.exists()){
-      const data = snap.val();
-      codeInput.value = data.code||"1234";
-      const cards = data.cards||[];
-      Array.from(editGrid.querySelectorAll("select")).forEach((s,i)=>{
-        if(cards[i]) s.value = cards[i];
-      });
-      setStatus("Data dimuat ✓");
-    }else{setStatus("Belum ada data");}
-  }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
-}
-
-// realtime update
-onValue(dbRef,(snap)=>{
-  if(snap.exists()){
-    setStatus("Update live dari database");
-  }
-});
-
-// tampilkan histori user dari usedCodes dengan waktu
-function loadHistory(){
+// tampilkan histori sesuai halaman
+function renderHistoryPage(){
   historyBody.innerHTML="";
+  if(historyData.length === 0){
+    historyBody.innerHTML="<tr><td colspan='11'>Belum ada histori</td></tr>";
+    pageInfo.textContent = "0";
+    return;
+  }
+  const totalPages = Math.ceil(historyData.length / ITEMS_PER_PAGE);
+  if(currentPage > totalPages) currentPage = totalPages;
+  if(currentPage < 1) currentPage = 1;
+
+  const startIdx = (currentPage-1)*ITEMS_PER_PAGE;
+  const pageItems = historyData.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  pageItems.forEach(item=>{
+    const tr = document.createElement("tr");
+    const tdCode = document.createElement("td");
+    tdCode.textContent = item.code;
+    tr.appendChild(tdCode);
+
+    const tdTime = document.createElement("td");
+    if(item.timestamp){
+      tdTime.textContent = new Date(item.timestamp).toLocaleString('id-ID');
+    } else tdTime.textContent = "-";
+    tr.appendChild(tdTime);
+
+    const cardsArr = item.cards || [];
+    for(let i=0;i<9;i++){
+      const td = document.createElement("td");
+      td.textContent = cardsArr[i] || "-";
+      tr.appendChild(td);
+    }
+    historyBody.appendChild(tr);
+  });
+
+  pageInfo.textContent = `${currentPage} / ${totalPages}`;
+}
+
+// load histori realtime
+function loadHistory(){
   onValue(usedRef,(snap)=>{
     if(snap.exists()){
       const data = snap.val();
-      historyBody.innerHTML="";
+      historyData = [];
       for(const [code,obj] of Object.entries(data)){
-        const tr = document.createElement("tr");
-        const tdCode = document.createElement("td");
-        tdCode.textContent = code;
-        tr.appendChild(tdCode);
-
-        // tanggal / waktu
-        const tdTime = document.createElement("td");
-        if(obj.timestamp){
-          const d = new Date(obj.timestamp);
-          tdTime.textContent = d.toLocaleString('id-ID');
-        } else {
-          tdTime.textContent = "-";
-        }
-        tr.appendChild(tdTime);
-
-        const cardsArr = obj.cards || [];
-        for(let i=0;i<9;i++){
-          const td = document.createElement("td");
-          td.textContent = cardsArr[i] || "-";
-          tr.appendChild(td);
-        }
-        historyBody.appendChild(tr);
+        historyData.push({code, cards: obj.cards||[], timestamp: obj.timestamp||null});
       }
+      // urutkan terbaru di atas
+      historyData.sort((a,b)=>b.timestamp - a.timestamp);
+      currentPage = 1;
+      renderHistoryPage();
     } else {
-      historyBody.innerHTML="<tr><td colspan='11'>Belum ada histori</td></tr>";
+      historyData = [];
+      renderHistoryPage();
     }
   });
 }
 
 buildGrid();
-loadFromFirebase();
 loadHistory();
 
-saveBtn.addEventListener("click",saveToFirebase);
-refreshBtn.addEventListener("click",loadFromFirebase);
+prevBtn.addEventListener("click",()=>{
+  currentPage--;
+  renderHistoryPage();
+});
+nextBtn.addEventListener("click",()=>{
+  currentPage++;
+  renderHistoryPage();
+});
 </script>
 </body>
 </html>

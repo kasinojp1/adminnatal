@@ -46,6 +46,7 @@ td{background:#0b0b0b;}
   <thead>
     <tr>
       <th>Kode</th>
+      <th>Status</th>
       <th>Waktu</th>
       <th>Kartu 1</th>
       <th>Kartu 2</th>
@@ -120,11 +121,11 @@ function setStatus(txt,ok=true){
   status.style.color = ok?"#9aa0a6":"#ff6b6b";
 }
 
-// tampilkan histori sesuai halaman
+// render halaman histori
 function renderHistoryPage(){
   historyBody.innerHTML="";
   if(historyData.length === 0){
-    historyBody.innerHTML="<tr><td colspan='11'>Belum ada histori</td></tr>";
+    historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
     pageInfo.textContent = "0";
     return;
   }
@@ -134,16 +135,20 @@ function renderHistoryPage(){
 
   const startIdx = (currentPage-1)*ITEMS_PER_PAGE;
   const pageItems = historyData.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
   pageItems.forEach(item=>{
     const tr = document.createElement("tr");
+
     const tdCode = document.createElement("td");
     tdCode.textContent = item.code;
     tr.appendChild(tdCode);
 
+    const tdStatus = document.createElement("td");
+    tdStatus.textContent = item.timestamp ? "Sudah digunakan" : "Belum digunakan";
+    tr.appendChild(tdStatus);
+
     const tdTime = document.createElement("td");
-    if(item.timestamp){
-      tdTime.textContent = new Date(item.timestamp).toLocaleString('id-ID');
-    } else tdTime.textContent = "-";
+    tdTime.textContent = item.timestamp ? new Date(item.timestamp).toLocaleString('id-ID') : "-";
     tr.appendChild(tdTime);
 
     const cardsArr = item.cards || [];
@@ -161,20 +166,15 @@ function renderHistoryPage(){
 // load histori realtime
 function loadHistory(){
   onValue(usedRef,(snap)=>{
+    historyData = [];
     if(snap.exists()){
       const data = snap.val();
-      historyData = [];
       for(const [code,obj] of Object.entries(data)){
         historyData.push({code, cards: obj.cards||[], timestamp: obj.timestamp||null});
       }
-      // urutkan terbaru di atas
       historyData.sort((a,b)=>b.timestamp - a.timestamp);
-      currentPage = 1;
-      renderHistoryPage();
-    } else {
-      historyData = [];
-      renderHistoryPage();
     }
+    renderHistoryPage();
   });
 }
 

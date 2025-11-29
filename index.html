@@ -15,12 +15,12 @@ h1{color:#d4af37;margin-bottom:10px;}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
 .card-editor{padding:10px;border-radius:10px;background:#0f1113;border:1px solid rgba(212,175,55,0.05);}
 select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;border:none;}
-.btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;}
+.btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;margin-top:10px;}
 .status{margin-top:12px;color:#9aa0a6;}
 table{width:100%;border-collapse:collapse;margin-top:20px;}
 th,td{border:1px solid rgba(212,175,55,0.1);padding:8px;text-align:center;}
 th{background:#0f1113;color:#d4af37;}
-td{background:#0b0b0b;color:#fff;}
+td{background:#0b0b0b;}
 .cards-list{font-size:13px;color:#bfc6c9;}
 </style>
 </head>
@@ -29,21 +29,20 @@ td{background:#0b0b0b;color:#fff;}
 <h1>Admin Panel - Set Kartu & Histori</h1>
 
 <label>Kode Akses Admin:</label>
-<input type="text" id="codeInput" placeholder="Masukkan kode baru" />
+<input type="text" id="codeInput" placeholder="Masukkan kode..."/>
 
 <div class="grid" id="editGrid"></div>
 
-<div style="margin-top:10px;">
-<button id="saveBtn" class="btn">Buat / Simpan Kode</button>
+<button id="saveBtn" class="btn">Simpan Kode & Kartu</button>
 <button id="refreshBtn" class="btn">Refresh</button>
-</div>
 <div class="status" id="status">Status: Idle</div>
 
-<h2 style="margin-top:30px;color:#d4af37;">Histori Kode User</h2>
+<h2 style="margin-top:20px;color:#d4af37;">Histori Kode User</h2>
 <table>
   <thead>
     <tr>
       <th>Kode</th>
+      <th>Waktu</th>
       <th>Kartu 1</th>
       <th>Kartu 2</th>
       <th>Kartu 3</th>
@@ -53,19 +52,17 @@ td{background:#0b0b0b;color:#fff;}
       <th>Kartu 7</th>
       <th>Kartu 8</th>
       <th>Kartu 9</th>
-      <th>Status</th>
-      <th>Dibuat pada</th>
     </tr>
   </thead>
   <tbody id="historyBody">
-    <!-- data realtime dari Firebase -->
+    <!-- realtime -->
   </tbody>
 </table>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, push } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
@@ -109,75 +106,52 @@ function setStatus(txt,ok=true){
 }
 
 async function saveToFirebase(){
-  const code = (codeInput.value || "").trim();
-  if(!code){
-    setStatus("Masukkan kode valid!", false);
-    return;
-  }
-
+  setStatus("Menyimpan...");
   const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
-  const createdAt = new Date().toISOString();
-
+  const code = codeInput.value.trim();
+  if(!code){ setStatus("Masukkan kode terlebih dahulu",false); return; }
   try{
-    // simpan kode di cards
-    await set(ref(db, `gameConfig/cards/${code}`), {
-      cards,
-      createdAt,
-      used: false
-    });
-
-    // simpan di usedCodes untuk histori
-    await set(ref(db, `gameConfig/usedCodes/${code}`), {
-      cards,
-      createdAt,
-      used: false
-    });
-
-    setStatus("Kode tersimpan ✓");
-    codeInput.value="";
+    await set(dbRef,{code,cards});
+    setStatus("Tersimpan ✓");
   }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
 }
 
-// load cards untuk edit grid
 async function loadFromFirebase(){
+  setStatus("Memuat...");
   try{
     const snap = await get(dbRef);
     if(snap.exists()){
       const data = snap.val();
-      const firstKey = Object.keys(data)[0];
-      const firstCards = data[firstKey].cards || [];
+      codeInput.value = data.code||"";
+      const cards = data.cards||[];
       Array.from(editGrid.querySelectorAll("select")).forEach((s,i)=>{
-        if(firstCards[i]) s.value = firstCards[i];
+        if(cards[i]) s.value = cards[i];
       });
       setStatus("Data dimuat ✓");
-    }else setStatus("Belum ada data");
+    }else{setStatus("Belum ada data");}
   }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
 }
 
-// realtime histori
 function loadHistory(){
-  onValue(usedRef, (snap)=>{
-    historyBody.innerHTML="";
+  historyBody.innerHTML="";
+  onValue(usedRef,(snap)=>{
     if(snap.exists()){
       const data = snap.val();
-      // urut terbaru di atas
-      const entries = Object.entries(data).sort((a,b)=>new Date(b[1].createdAt) - new Date(a[1].createdAt));
-      entries.forEach(([code,obj])=>{
+      const arr = Object.entries(data).sort((a,b)=>b[1].time - a[1].time); // terbaru di atas
+      historyBody.innerHTML="";
+      for(const [code,obj] of arr){
         const tr = document.createElement("tr");
-        const tdCode = document.createElement("td"); tdCode.textContent = code; tr.appendChild(tdCode);
-        for(let i=0;i<9;i++){
-          const td = document.createElement("td");
-          td.textContent = obj.cards[i] || "-";
-          tr.appendChild(td);
-        }
-        const tdStatus = document.createElement("td"); tdStatus.textContent = obj.used ? "Sudah" : "Belum"; tr.appendChild(tdStatus);
+        const tdCode = document.createElement("td"); tdCode.textContent=code; tr.appendChild(tdCode);
         const tdTime = document.createElement("td"); 
-        tdTime.textContent = new Date(obj.createdAt).toLocaleString(); 
-        tr.appendChild(tdTime);
+        tdTime.textContent = new Date(obj.time).toLocaleString(); tr.appendChild(tdTime);
+        const cardsArr = obj.cards||[];
+        for(let i=0;i<9;i++){
+          const td = document.createElement("td"); td.textContent = cardsArr[i] || "-"; tr.appendChild(td);
+        }
         historyBody.appendChild(tr);
-      });
+      }
     } else {
-      historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
+      historyBody.innerHTML="<tr><td colspan='11'>Belum ada histori</td></tr>";
     }
   });
 }
@@ -188,7 +162,6 @@ loadHistory();
 
 saveBtn.addEventListener("click",saveToFirebase);
 refreshBtn.addEventListener("click",loadFromFirebase);
-
 </script>
 </body>
 </html>

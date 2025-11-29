@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Set Kartu (Elegant Black & Gold)</title>
+  <style>
+    :root{
+      --bg:#0b0b0b;
+      --card:#0f1720;
+      --gold:#d4af37;
+      --muted:#9aa0a6;
+      --accent:#111827;
+    }
+    body{
+      margin:0;font-family:Inter, Poppins, sans-serif;
+      background:linear-gradient(180deg,#090909 0%, #0d0d0d 100%);
+      color:#eee;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+    }
+    .panel{
+      width:100%;max-width:960px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(212,175,55,0.08);
+      padding:22px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.6);
+    }
+    h1{margin:0 0 6px;color:var(--gold)}
+    p.lead{color:var(--muted);margin:0 0 18px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type="text"]{
+      padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#0b1114;color:#fff;width:220px;
+    }
+    .grid{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;
+    }
+    .card-editor{
+      background:linear-gradient(180deg,#0f1215,#0b0f12);padding:14px;border-radius:10px;border:1px solid rgba(212,175,55,0.06);
+      box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2);
+    }
+    select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.2);background:#0f1113;color:#fff}
+    .btn{
+      background:linear-gradient(90deg,var(--gold), #f0d56a);color:#111;padding:10px 14px;border-radius:10px;border:none;font-weight:700;cursor:pointer;
+      box-shadow:0 6px 18px rgba(212,175,55,0.12);
+    }
+    .small{font-size:13px;color:var(--muted)}
+    .status{margin-top:12px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted)}
+    footer{margin-top:14px;font-size:12px;color:var(--muted)}
+    .top-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    @media (max-width:640px){
+      .grid{grid-template-columns:repeat(3,1fr)}
+    }
+  </style>
+</head>
+<body>
+  <div class="panel" role="main">
+    <div class="top-row">
+      <div>
+        <h1>Admin Panel — Set Kartu</h1>
+        <p class="lead">Tema: Elegan Hitam & Emas · Kode default: <strong>1234</strong></p>
+      </div>
+      <div style="text-align:right">
+        <div class="small">Project Firebase: <strong>ariptoto-93af7</strong></div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label for="codeInput">Kode Akses (user harus masukkan ini untuk tebak)</label>
+      <input id="codeInput" type="text" value="1234" />
+    </div>
+
+    <div style="margin-top:14px">
+      <label>Atur Isi 9 Kartu (3 Platinum, 3 Diamond, 3 Super Diamond)</label>
+      <div class="grid" id="editGrid">
+        <!-- JS akan render 9 editor -->
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button id="saveBtn" class="btn">Save to Firebase</button>
+      <button id="refreshBtn" class="btn" style="background:transparent;color:var(--gold);border:1px solid rgba(212,175,55,0.12)">Refresh from Firebase</button>
+      <div class="small" style="margin-left:8px;color:var(--muted)">Perubahan akan tersimpan ke Firestore (koleksi <code>gameConfig</code>, dokumen <code>cards</code>).</div>
+    </div>
+
+    <div class="status" id="status">Status: Idle</div>
+    <footer>Tip: setelah update, user yang membuka halaman akan melihat perubahan secara real-time.</footer>
+  </div>
+
+  <!-- Firebase v9 (modular) -->
+  <script type="module">
+    // ====== FIREBASE CONFIG - GANTI SESUAI YG KAMU KIRIM ======
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDzikWeuSIoMTCC6wsD64NnX5bLQQvM2dA",
+      authDomain: "ariptoto-93af7.firebaseapp.com",
+      projectId: "ariptoto-93af7",
+      storageBucket: "ariptoto-93af7.appspot.com",
+      messagingSenderId: "703805134804",
+      appId: "1:703805134804:web:402e7f9e378ae1ecdb2841"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const docRef = doc(db, "gameConfig", "cards");
+
+    // ===== UI & helpers =====
+    const editGrid = document.getElementById('editGrid');
+    const status = document.getElementById('status');
+    const codeInput = document.getElementById('codeInput');
+    const saveBtn = document.getElementById('saveBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    const OPTIONS = ['Platinum','Diamond','Super Diamond'];
+
+    // build 9 selects
+    for(let i=0;i<9;i++){
+      const wrap = document.createElement('div');
+      wrap.className = 'card-editor';
+      wrap.innerHTML = `
+        <div style="font-size:13px;margin-bottom:6px;color:var(--muted)">Kartu ${i+1}</div>
+        <select data-index="${i}">
+          ${OPTIONS.map(o=>`<option value="${o}">${o}</option>`).join('')}
+        </select>
+      `;
+      editGrid.appendChild(wrap);
+    }
+
+    function setStatus(txt, ok=true){
+      status.textContent = 'Status: ' + txt;
+      status.style.color = ok ? '' : '#ffb3b3';
+    }
+
+    async function saveToFirebase(){
+      try{
+        setStatus('Menyimpan ke Firebase...');
+        const selects = Array.from(document.querySelectorAll('#editGrid select'));
+        const cards = selects.map(s=>s.value);
+        const code = (codeInput.value || '').trim() || '1234';
+        await setDoc(docRef, { code, cards });
+        setStatus('Tersimpan ✓');
+      }catch(err){
+        console.error(err); setStatus('Gagal menyimpan: '+err.message, false);
+      }
+    }
+
+    async function loadFromFirebase(){
+      try{
+        setStatus('Memuat data dari Firebase...');
+        const snap = await getDoc(docRef);
+        if(snap.exists()){
+          const data = snap.data();
+          codeInput.value = data.code || '1234';
+          const cards = data.cards || [];
+          const selects = Array.from(document.querySelectorAll('#editGrid select'));
+          selects.forEach((s, idx)=>{
+            if(cards[idx]) s.value = cards[idx];
+            else s.selectedIndex = 0;
+          });
+          setStatus('Data berhasil dimuat ✓');
+        }else{
+          setStatus('Belum ada data — gunakan Save untuk membuat dokumen.');
+        }
+      }catch(err){
+        console.error(err); setStatus('Gagal memuat: '+err.message, false);
+      }
+    }
+
+    saveBtn.addEventListener('click', saveToFirebase);
+    refreshBtn.addEventListener('click', loadFromFirebase);
+
+    // realtime listener (opsional) — tampilkan notifikasi bila berubah
+    onSnapshot(docRef, (snap)=>{
+      if(!snap.exists()) return;
+      const d = snap.data();
+      setStatus('Perubahan terdeteksi (live). Kode: '+(d.code||'—') );
+    }, (err)=>{ console.warn('snapshot err', err); });
+
+    // initial load
+    loadFromFirebase();
+  </script>
+</body>
+</html>

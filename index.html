@@ -15,13 +15,16 @@ h1{color:#d4af37;margin-bottom:10px;}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
 .card-editor{padding:10px;border-radius:10px;background:#0f1113;border:1px solid rgba(212,175,55,0.05);}
 select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;border:none;}
-.btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;margin-top:10px;}
+.btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;}
 .status{margin-top:12px;color:#9aa0a6;}
 table{width:100%;border-collapse:collapse;margin-top:20px;}
 th,td{border:1px solid rgba(212,175,55,0.1);padding:8px;text-align:center;}
 th{background:#0f1113;color:#d4af37;}
-td{background:#0b0b0b;}
+td{background:#0b0b0b;color:#fff;}
 .cards-list{font-size:13px;color:#bfc6c9;}
+.time{font-size:12px;color:#9aa0a6;}
+.used-yes{color:#4caf50;font-weight:600;}
+.used-no{color:#ff6b6b;font-weight:600;}
 </style>
 </head>
 <body>
@@ -29,20 +32,21 @@ td{background:#0b0b0b;}
 <h1>Admin Panel - Set Kartu & Histori</h1>
 
 <label>Kode Akses Admin:</label>
-<input type="text" id="codeInput" placeholder="Masukkan kode..."/>
+<input type="text" id="codeInput" value="1234"/>
 
 <div class="grid" id="editGrid"></div>
 
-<button id="saveBtn" class="btn">Simpan Kode & Kartu</button>
+<div style="margin-top:10px;">
+<button id="saveBtn" class="btn">Save</button>
 <button id="refreshBtn" class="btn">Refresh</button>
+</div>
 <div class="status" id="status">Status: Idle</div>
 
-<h2 style="margin-top:20px;color:#d4af37;">Histori Kode User</h2>
+<h2 style="margin-top:30px;color:#d4af37;">Histori Kode User</h2>
 <table>
   <thead>
     <tr>
       <th>Kode</th>
-      <th>Waktu</th>
       <th>Kartu 1</th>
       <th>Kartu 2</th>
       <th>Kartu 3</th>
@@ -52,17 +56,19 @@ td{background:#0b0b0b;}
       <th>Kartu 7</th>
       <th>Kartu 8</th>
       <th>Kartu 9</th>
+      <th>Waktu</th>
+      <th>Status</th>
     </tr>
   </thead>
   <tbody id="historyBody">
-    <!-- realtime -->
+    <tr><td colspan="12">Belum ada histori</td></tr>
   </tbody>
 </table>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, push } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
@@ -108,8 +114,7 @@ function setStatus(txt,ok=true){
 async function saveToFirebase(){
   setStatus("Menyimpan...");
   const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
-  const code = codeInput.value.trim();
-  if(!code){ setStatus("Masukkan kode terlebih dahulu",false); return; }
+  const code = codeInput.value || "1234";
   try{
     await set(dbRef,{code,cards});
     setStatus("Tersimpan ✓");
@@ -122,7 +127,7 @@ async function loadFromFirebase(){
     const snap = await get(dbRef);
     if(snap.exists()){
       const data = snap.val();
-      codeInput.value = data.code||"";
+      codeInput.value = data.code||"1234";
       const cards = data.cards||[];
       Array.from(editGrid.querySelectorAll("select")).forEach((s,i)=>{
         if(cards[i]) s.value = cards[i];
@@ -132,27 +137,35 @@ async function loadFromFirebase(){
   }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
 }
 
+// Load histori user
 function loadHistory(){
   historyBody.innerHTML="";
   onValue(usedRef,(snap)=>{
-    if(snap.exists()){
-      const data = snap.val();
-      const arr = Object.entries(data).sort((a,b)=>b[1].time - a[1].time); // terbaru di atas
-      historyBody.innerHTML="";
-      for(const [code,obj] of arr){
-        const tr = document.createElement("tr");
-        const tdCode = document.createElement("td"); tdCode.textContent=code; tr.appendChild(tdCode);
-        const tdTime = document.createElement("td"); 
-        tdTime.textContent = new Date(obj.time).toLocaleString(); tr.appendChild(tdTime);
-        const cardsArr = obj.cards||[];
-        for(let i=0;i<9;i++){
-          const td = document.createElement("td"); td.textContent = cardsArr[i] || "-"; tr.appendChild(td);
-        }
-        historyBody.appendChild(tr);
-      }
-    } else {
-      historyBody.innerHTML="<tr><td colspan='11'>Belum ada histori</td></tr>";
+    const data = snap.exists() ? snap.val() : {};
+    const arr = Object.entries(data).sort((a,b)=> b[1].time - a[1].time); // terbaru di atas
+    if(arr.length===0){
+      historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
+      return;
     }
+    historyBody.innerHTML="";
+    arr.forEach(([code,obj])=>{
+      const tr = document.createElement("tr");
+      const tdCode=document.createElement("td"); tdCode.textContent=code; tr.appendChild(tdCode);
+      const cardsArr = obj.cards || [];
+      for(let i=0;i<9;i++){
+        const td=document.createElement("td");
+        td.textContent = cardsArr[i] || "-";
+        tr.appendChild(td);
+      }
+      const tdTime=document.createElement("td");
+      tdTime.textContent = obj.time ? new Date(obj.time).toLocaleString() : "-";
+      tr.appendChild(tdTime);
+      const tdStatus=document.createElement("td");
+      tdStatus.textContent = (obj.cards && obj.cards.some(c=>c)) ? "Sudah dipakai":"Belum dipakai";
+      tdStatus.className = (tdStatus.textContent==="Sudah dipakai") ? "used-yes":"used-no";
+      tr.appendChild(tdStatus);
+      historyBody.appendChild(tr);
+    });
   });
 }
 

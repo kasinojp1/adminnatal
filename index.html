@@ -9,7 +9,7 @@ body{
   margin:0;font-family:Inter,Poppins,sans-serif;background:#0b0b0b;color:#eee;display:flex;justify-content:center;padding:20px;
 }
 .panel{
-  width:100%;max-width:1200px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);
+  width:100%;max-width:1000px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);
 }
 h1{color:#d4af37;margin-bottom:10px;}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
@@ -18,9 +18,9 @@ select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;bo
 .btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;}
 .status{margin-top:12px;color:#9aa0a6;}
 table{width:100%;border-collapse:collapse;margin-top:20px;}
-th,td{border:1px solid rgba(212,175,55,0.1);padding:6px;text-align:center;font-size:13px;}
+th,td{border:1px solid rgba(212,175,55,0.1);padding:8px;text-align:center;}
 th{background:#0f1113;color:#d4af37;}
-td{background:#0b0b0b;}
+td{background:#0b0b0b;color:#fff;}
 .cards-list{font-size:13px;color:#bfc6c9;}
 </style>
 </head>
@@ -28,13 +28,13 @@ td{background:#0b0b0b;}
 <div class="panel">
 <h1>Admin Panel - Set Kartu & Histori</h1>
 
-<label>Kode Admin:</label>
-<input type="text" id="codeInput" placeholder="Masukkan kode baru"/>
+<label>Kode Akses Admin:</label>
+<input type="text" id="codeInput" placeholder="Masukkan kode baru" />
 
 <div class="grid" id="editGrid"></div>
 
 <div style="margin-top:10px;">
-<button id="saveBtn" class="btn">Save Kode</button>
+<button id="saveBtn" class="btn">Buat / Simpan Kode</button>
 <button id="refreshBtn" class="btn">Refresh</button>
 </div>
 <div class="status" id="status">Status: Idle</div>
@@ -44,8 +44,6 @@ td{background:#0b0b0b;}
   <thead>
     <tr>
       <th>Kode</th>
-      <th>Status</th>
-      <th>Jam Dibuat</th>
       <th>Kartu 1</th>
       <th>Kartu 2</th>
       <th>Kartu 3</th>
@@ -55,17 +53,19 @@ td{background:#0b0b0b;}
       <th>Kartu 7</th>
       <th>Kartu 8</th>
       <th>Kartu 9</th>
+      <th>Status</th>
+      <th>Dibuat pada</th>
     </tr>
   </thead>
   <tbody id="historyBody">
-    <tr><td colspan="12">Memuat histori...</td></tr>
+    <!-- data realtime dari Firebase -->
   </tbody>
 </table>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, push } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
@@ -80,6 +80,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const dbRef = ref(db, "gameConfig/cards");
+const usedRef = ref(db, "gameConfig/usedCodes");
 
 const editGrid = document.getElementById('editGrid');
 const codeInput = document.getElementById('codeInput');
@@ -106,78 +108,74 @@ function setStatus(txt,ok=true){
   status.style.color = ok?"#9aa0a6":"#ff6b6b";
 }
 
-// Save kode admin + kartu ke Firebase
 async function saveToFirebase(){
-  const code = codeInput.value.trim();
+  const code = (codeInput.value || "").trim();
   if(!code){
-    setStatus("Masukkan kode terlebih dahulu", false);
+    setStatus("Masukkan kode valid!", false);
     return;
   }
+
   const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
-  const codeRef = ref(db, `gameConfig/cards/${code}`);
+  const createdAt = new Date().toISOString();
+
   try{
-    await set(codeRef, {
+    // simpan kode di cards
+    await set(ref(db, `gameConfig/cards/${code}`), {
       cards,
-      createdAt: new Date().toISOString(),
+      createdAt,
       used: false
     });
+
+    // simpan di usedCodes untuk histori
+    await set(ref(db, `gameConfig/usedCodes/${code}`), {
+      cards,
+      createdAt,
+      used: false
+    });
+
     setStatus("Kode tersimpan ✓");
-    codeInput.value = "";
+    codeInput.value="";
   }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
 }
 
-// Load kode admin + kartu
+// load cards untuk edit grid
 async function loadFromFirebase(){
-  setStatus("Memuat...");
-  buildGrid();
   try{
-    const cardsSnap = await get(ref(db,"gameConfig/cards"));
-    if(cardsSnap.exists()){
-      const data = cardsSnap.val();
-      // Jika ingin pilih salah satu kode untuk edit
-      // di sini kita tidak otomatis ganti grid
-      setStatus("Data kode admin dimuat ✓");
-    }else{
-      setStatus("Belum ada data");
-    }
+    const snap = await get(dbRef);
+    if(snap.exists()){
+      const data = snap.val();
+      const firstKey = Object.keys(data)[0];
+      const firstCards = data[firstKey].cards || [];
+      Array.from(editGrid.querySelectorAll("select")).forEach((s,i)=>{
+        if(firstCards[i]) s.value = firstCards[i];
+      });
+      setStatus("Data dimuat ✓");
+    }else setStatus("Belum ada data");
   }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
 }
 
-// Load histori user
+// realtime histori
 function loadHistory(){
-  historyBody.innerHTML="<tr><td colspan='12'>Memuat...</td></tr>";
-  onValue(ref(db,"gameConfig/usedCodes"), snap=>{
+  onValue(usedRef, (snap)=>{
     historyBody.innerHTML="";
     if(snap.exists()){
       const data = snap.val();
       // urut terbaru di atas
-      const entries = Object.entries(data).sort((a,b)=>{
-        const t1 = new Date(a[1].createdAt).getTime();
-        const t2 = new Date(b[1].createdAt).getTime();
-        return t2-t1;
-      });
-      for(const [code,obj] of entries){
+      const entries = Object.entries(data).sort((a,b)=>new Date(b[1].createdAt) - new Date(a[1].createdAt));
+      entries.forEach(([code,obj])=>{
         const tr = document.createElement("tr");
-        const tdCode = document.createElement("td");
-        tdCode.textContent = code;
-        tr.appendChild(tdCode);
-
-        const tdStatus = document.createElement("td");
-        tdStatus.textContent = obj.used ? "Sudah digunakan" : "Belum digunakan";
-        tr.appendChild(tdStatus);
-
-        const tdTime = document.createElement("td");
-        tdTime.textContent = obj.createdAt ? new Date(obj.createdAt).toLocaleString() : "-";
-        tr.appendChild(tdTime);
-
-        const cardsArr = obj.cards || [];
+        const tdCode = document.createElement("td"); tdCode.textContent = code; tr.appendChild(tdCode);
         for(let i=0;i<9;i++){
           const td = document.createElement("td");
-          td.textContent = cardsArr[i] || "-";
+          td.textContent = obj.cards[i] || "-";
           tr.appendChild(td);
         }
+        const tdStatus = document.createElement("td"); tdStatus.textContent = obj.used ? "Sudah" : "Belum"; tr.appendChild(tdStatus);
+        const tdTime = document.createElement("td"); 
+        tdTime.textContent = new Date(obj.createdAt).toLocaleString(); 
+        tr.appendChild(tdTime);
         historyBody.appendChild(tr);
-      }
+      });
     } else {
       historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
     }
@@ -190,6 +188,7 @@ loadHistory();
 
 saveBtn.addEventListener("click",saveToFirebase);
 refreshBtn.addEventListener("click",loadFromFirebase);
+
 </script>
 </body>
 </html>

@@ -44,6 +44,7 @@ td{background:#0b0b0b;}
   <thead>
     <tr>
       <th>Kode</th>
+      <th>Waktu</th>
       <th>Kartu 1</th>
       <th>Kartu 2</th>
       <th>Kartu 3</th>
@@ -139,7 +140,7 @@ onValue(dbRef,(snap)=>{
   }
 });
 
-// tampilkan histori user dari usedCodes
+// tampilkan histori user dari usedCodes dengan waktu
 function loadHistory(){
   historyBody.innerHTML="";
   onValue(usedRef,(snap)=>{
@@ -151,6 +152,17 @@ function loadHistory(){
         const tdCode = document.createElement("td");
         tdCode.textContent = code;
         tr.appendChild(tdCode);
+
+        // tanggal / waktu
+        const tdTime = document.createElement("td");
+        if(obj.timestamp){
+          const d = new Date(obj.timestamp);
+          tdTime.textContent = d.toLocaleString('id-ID');
+        } else {
+          tdTime.textContent = "-";
+        }
+        tr.appendChild(tdTime);
+
         const cardsArr = obj.cards || [];
         for(let i=0;i<9;i++){
           const td = document.createElement("td");
@@ -160,7 +172,7 @@ function loadHistory(){
         historyBody.appendChild(tr);
       }
     } else {
-      historyBody.innerHTML="<tr><td colspan='10'>Belum ada histori</td></tr>";
+      historyBody.innerHTML="<tr><td colspan='11'>Belum ada histori</td></tr>";
     }
   });
 }

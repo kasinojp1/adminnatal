@@ -28,7 +28,8 @@ select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;bo
 }
 .history h2{font-size:16px;margin-top:0;color:#d4af37;}
 .history ul{list-style:none;padding:0;margin:0;}
-.history li{padding:4px 0;border-bottom:1px solid rgba(212,175,55,0.05);}
+.history li{padding:4px 6px;border-bottom:1px solid rgba(212,175,55,0.05);}
+.history .cards{font-size:13px;color:#bfc6c9;margin-top:2px;}
 </style>
 </head>
 <body>
@@ -55,7 +56,7 @@ select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;bo
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, child } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
@@ -131,7 +132,7 @@ onValue(dbRef,(snap)=>{
   }
 });
 
-// Histori kode & hadiah
+// Histori kode & hadiah lengkap
 function loadHistory(){
   historyList.innerHTML="";
   onValue(usedRef,(snap)=>{
@@ -140,7 +141,13 @@ function loadHistory(){
       historyList.innerHTML="";
       for(const [code,obj] of Object.entries(data)){
         const li = document.createElement("li");
-        li.textContent = `Kode: ${code} — Hadiah: ${obj?.prizes ? obj.prizes.join(", ") : "N/A"}`;
+        li.textContent = `Kode: ${code}`;
+        if(obj?.cards){
+          const cardsList = document.createElement("div");
+          cardsList.className="cards";
+          cardsList.textContent = `Kartu: ${obj.cards.join(", ")}`;
+          li.appendChild(cardsList);
+        }
         historyList.appendChild(li);
       }
     } else {

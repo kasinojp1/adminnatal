@@ -34,15 +34,20 @@
     }
     .card-editor{
       background:linear-gradient(180deg,#0f1215,#0b0f12);padding:14px;border-radius:10px;border:1px solid rgba(212,175,55,0.06);
-      box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2);
+      box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2);position:relative;
+    }
+    .card-preview{
+      position:absolute;top:8px;right:8px;font-size:12px;padding:2px 6px;border-radius:6px;background:rgba(212,175,55,0.2);color:#fff;
     }
     select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.2);background:#0f1113;color:#fff}
     .btn{
       background:linear-gradient(90deg,var(--gold), #f0d56a);color:#111;padding:10px 14px;border-radius:10px;border:none;font-weight:700;cursor:pointer;
       box-shadow:0 6px 18px rgba(212,175,55,0.12);
+      transition:all 0.2s ease;
     }
+    .btn:hover{box-shadow:0 8px 22px rgba(212,175,55,0.2);}
     .small{font-size:13px;color:var(--muted)}
-    .status{margin-top:12px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted)}
+    .status{margin-top:12px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);}
     footer{margin-top:14px;font-size:12px;color:var(--muted)}
     .top-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     @media (max-width:640px){
@@ -69,14 +74,12 @@
 
     <div style="margin-top:14px">
       <label>Atur Isi 9 Kartu (3 Platinum, 3 Diamond, 3 Super Diamond)</label>
-      <div class="grid" id="editGrid">
-        <!-- JS akan render 9 editor -->
-      </div>
+      <div class="grid" id="editGrid"></div>
     </div>
 
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
-      <button id="saveBtn" class="btn">Save to Firebase</button>
-      <button id="refreshBtn" class="btn" style="background:transparent;color:var(--gold);border:1px solid rgba(212,175,55,0.12)">Refresh from Firebase</button>
+      <button id="saveBtn" class="btn">💾 Save to Firebase</button>
+      <button id="refreshBtn" class="btn" style="background:transparent;color:var(--gold);border:1px solid rgba(212,175,55,0.12)">🔄 Refresh from Firebase</button>
       <div class="small" style="margin-left:8px;color:var(--muted)">Perubahan akan tersimpan ke Firestore (koleksi <code>gameConfig</code>, dokumen <code>cards</code>).</div>
     </div>
 
@@ -84,9 +87,7 @@
     <footer>Tip: setelah update, user yang membuka halaman akan melihat perubahan secara real-time.</footer>
   </div>
 
-  <!-- Firebase v9 (modular) -->
   <script type="module">
-    // ====== FIREBASE CONFIG - GANTI SESUAI YG KAMU KIRIM ======
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
     import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
@@ -103,7 +104,6 @@
     const db = getFirestore(app);
     const docRef = doc(db, "gameConfig", "cards");
 
-    // ===== UI & helpers =====
     const editGrid = document.getElementById('editGrid');
     const status = document.getElementById('status');
     const codeInput = document.getElementById('codeInput');
@@ -112,11 +112,12 @@
 
     const OPTIONS = ['Platinum','Diamond','Super Diamond'];
 
-    // build 9 selects
+    // Build 9 card editors dengan preview
     for(let i=0;i<9;i++){
       const wrap = document.createElement('div');
       wrap.className = 'card-editor';
       wrap.innerHTML = `
+        <div class="card-preview" id="preview${i}">Platinum</div>
         <div style="font-size:13px;margin-bottom:6px;color:var(--muted)">Kartu ${i+1}</div>
         <select data-index="${i}">
           ${OPTIONS.map(o=>`<option value="${o}">${o}</option>`).join('')}
@@ -130,7 +131,13 @@
       status.style.color = ok ? '' : '#ffb3b3';
     }
 
+    function updatePreview(idx, value){
+      const el = document.getElementById('preview'+idx);
+      if(el) el.textContent = value;
+    }
+
     async function saveToFirebase(){
+      if(!confirm("Yakin ingin menyimpan perubahan ke Firebase?")) return;
       try{
         setStatus('Menyimpan ke Firebase...');
         const selects = Array.from(document.querySelectorAll('#editGrid select'));
@@ -155,6 +162,7 @@
           selects.forEach((s, idx)=>{
             if(cards[idx]) s.value = cards[idx];
             else s.selectedIndex = 0;
+            updatePreview(idx, s.value);
           });
           setStatus('Data berhasil dimuat ✓');
         }else{
@@ -165,17 +173,23 @@
       }
     }
 
+    // Update preview saat select berubah
+    editGrid.addEventListener('change', e=>{
+      if(e.target.tagName==='SELECT'){
+        const idx = e.target.dataset.index;
+        updatePreview(idx, e.target.value);
+      }
+    });
+
     saveBtn.addEventListener('click', saveToFirebase);
     refreshBtn.addEventListener('click', loadFromFirebase);
 
-    // realtime listener (opsional) — tampilkan notifikasi bila berubah
     onSnapshot(docRef, (snap)=>{
       if(!snap.exists()) return;
       const d = snap.data();
       setStatus('Perubahan terdeteksi (live). Kode: '+(d.code||'—') );
     }, (err)=>{ console.warn('snapshot err', err); });
 
-    // initial load
     loadFromFirebase();
   </script>
 </body>

@@ -1,25 +1,41 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Admin - Set Kartu</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Admin - Set Kartu & Histori</title>
 <style>
-body{margin:0;font-family:Inter,Poppins,sans-serif;background:#0b0b0b;color:#eee;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;}
-.panel{width:100%;max-width:800px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);}
-h1{color:#d4af37;}
+body{
+  margin:0;font-family:Inter,Poppins,sans-serif;background:#0b0b0b;color:#eee;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:20px;
+}
+.panel{
+  width:100%;max-width:900px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);
+}
+h1{color:#d4af37;margin-bottom:10px;}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
 .card-editor{padding:10px;border-radius:10px;background:#0f1113;border:1px solid rgba(212,175,55,0.05);}
 select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;border:none;}
 .btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;}
 .status{margin-top:12px;color:#9aa0a6;}
+.history{
+  margin-top:20px;
+  background:#111;
+  border:1px solid rgba(212,175,55,0.05);
+  border-radius:10px;
+  padding:12px;
+  max-height:300px;
+  overflow-y:auto;
+}
+.history h2{font-size:16px;margin-top:0;color:#d4af37;}
+.history ul{list-style:none;padding:0;margin:0;}
+.history li{padding:4px 0;border-bottom:1px solid rgba(212,175,55,0.05);}
 </style>
 </head>
 <body>
 <div class="panel">
 <h1>Admin Panel - Set Kartu</h1>
 <label>Kode Akses:</label>
-<input type="text" id="codeInput" value="1234" />
+<input type="text" id="codeInput" value="1234"/>
 
 <div class="grid" id="editGrid"></div>
 
@@ -28,11 +44,18 @@ select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;bo
 <button id="refreshBtn" class="btn">Refresh</button>
 </div>
 <div class="status" id="status">Status: Idle</div>
+
+<div class="history">
+<h2>Histori Kode & Hadiah</h2>
+<ul id="historyList">
+<!-- Akan diisi dari Firebase -->
+</ul>
+</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, child } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
@@ -48,12 +71,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const dbRef = ref(db, "gameConfig/cards");
+const usedRef = ref(db, "gameConfig/usedCodes");
 
 const editGrid = document.getElementById('editGrid');
 const codeInput = document.getElementById('codeInput');
 const saveBtn = document.getElementById('saveBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const status = document.getElementById('status');
+const historyList = document.getElementById('historyList');
 
 const OPTIONS = ["Platinum","Diamond","Super Diamond"];
 
@@ -106,8 +131,27 @@ onValue(dbRef,(snap)=>{
   }
 });
 
+// Histori kode & hadiah
+function loadHistory(){
+  historyList.innerHTML="";
+  onValue(usedRef,(snap)=>{
+    if(snap.exists()){
+      const data = snap.val();
+      historyList.innerHTML="";
+      for(const [code,obj] of Object.entries(data)){
+        const li = document.createElement("li");
+        li.textContent = `Kode: ${code} — Hadiah: ${obj?.prizes ? obj.prizes.join(", ") : "N/A"}`;
+        historyList.appendChild(li);
+      }
+    } else {
+      historyList.innerHTML="<li>Belum ada histori</li>";
+    }
+  });
+}
+
 buildGrid();
 loadFromFirebase();
+loadHistory();
 
 saveBtn.addEventListener("click",saveToFirebase);
 refreshBtn.addEventListener("click",loadFromFirebase);

@@ -4,12 +4,13 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Admin - Set Kartu & Histori</title>
+
 <style>
 body{
   margin:0;font-family:Inter,Poppins,sans-serif;background:#0b0b0b;color:#eee;display:flex;justify-content:center;padding:20px;
 }
 .panel{
-  width:100%;max-width:1000px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);
+  width:100%;max-width:1100px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);
 }
 h1{color:#d4af37;margin-bottom:10px;}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
@@ -17,17 +18,28 @@ h1{color:#d4af37;margin-bottom:10px;}
 select{width:100%;padding:8px;border-radius:8px;background:#0b1114;color:#fff;border:none;}
 .btn{background:#d4af37;color:#111;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;margin-right:8px;}
 .status{margin-top:12px;color:#9aa0a6;}
-table{width:100%;border-collapse:collapse;margin-top:20px;}
+
+table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px;}
 th,td{border:1px solid rgba(212,175,55,0.1);padding:8px;text-align:center;}
 th{background:#0f1113;color:#d4af37;}
 td{background:#0b0b0b;color:#fff;}
-.cards-list{font-size:13px;color:#bfc6c9;}
-.time{font-size:12px;color:#9aa0a6;}
+
 .used-yes{color:#4caf50;font-weight:600;}
 .used-no{color:#ff6b6b;font-weight:600;}
+
+.pagination{
+  margin-top:20px;text-align:center;
+}
+.page-btn{
+  background:#222;color:#d4af37;border:1px solid #444;padding:8px 12px;margin:3px;border-radius:6px;cursor:pointer;
+}
+.page-btn.active{
+  background:#d4af37;color:#000;font-weight:700;
+}
 </style>
 </head>
 <body>
+
 <div class="panel">
 <h1>Admin Panel - Set Kartu & Histori</h1>
 
@@ -40,30 +52,35 @@ td{background:#0b0b0b;color:#fff;}
 <button id="saveBtn" class="btn">Save</button>
 <button id="refreshBtn" class="btn">Refresh</button>
 </div>
+
 <div class="status" id="status">Status: Idle</div>
 
 <h2 style="margin-top:30px;color:#d4af37;">Histori Kode User</h2>
+
 <table>
-  <thead>
-    <tr>
-      <th>Kode</th>
-      <th>Kartu 1</th>
-      <th>Kartu 2</th>
-      <th>Kartu 3</th>
-      <th>Kartu 4</th>
-      <th>Kartu 5</th>
-      <th>Kartu 6</th>
-      <th>Kartu 7</th>
-      <th>Kartu 8</th>
-      <th>Kartu 9</th>
-      <th>Waktu</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody id="historyBody">
-    <tr><td colspan="12">Belum ada histori</td></tr>
-  </tbody>
+<thead>
+<tr>
+  <th>Kode</th>
+  <th>Kartu 1</th>
+  <th>Kartu 2</th>
+  <th>Kartu 3</th>
+  <th>Kartu 4</th>
+  <th>Kartu 5</th>
+  <th>Kartu 6</th>
+  <th>Kartu 7</th>
+  <th>Kartu 8</th>
+  <th>Kartu 9</th>
+  <th>Waktu</th>
+  <th>Status</th>
+</tr>
+</thead>
+<tbody id="historyBody">
+  <tr><td colspan="12">Memuat...</td></tr>
+</tbody>
 </table>
+
+<div id="pagination" class="pagination"></div>
+
 </div>
 
 <script type="module">
@@ -83,95 +100,145 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const dbRef = ref(db, "gameConfig/cards");
+
+const configRef = ref(db, "gameConfig/cards");
 const usedRef = ref(db, "gameConfig/usedCodes");
 
-const editGrid = document.getElementById('editGrid');
-const codeInput = document.getElementById('codeInput');
-const saveBtn = document.getElementById('saveBtn');
-const refreshBtn = document.getElementById('refreshBtn');
-const status = document.getElementById('status');
-const historyBody = document.getElementById('historyBody');
+const editGrid = document.getElementById("editGrid");
+const codeInput = document.getElementById("codeInput");
+const saveBtn = document.getElementById("saveBtn");
+const refreshBtn = document.getElementById("refreshBtn");
+const historyBody = document.getElementById("historyBody");
+const pagination = document.getElementById("pagination");
+const status = document.getElementById("status");
 
 const OPTIONS = ["Platinum","Diamond","Super Diamond"];
 
+let historyData = [];
+let currentPage = 1;
+const perPage = 10;
+
+// membuat 9 kartu
 function buildGrid(){
   editGrid.innerHTML="";
   for(let i=0;i<9;i++){
     const wrap=document.createElement("div");
     wrap.className="card-editor";
-    wrap.innerHTML=`<div>Kartu ${i+1}</div>
-    <select data-index="${i}">${OPTIONS.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+    wrap.innerHTML=`
+      <div>Kartu ${i+1}</div>
+      <select data-index="${i}">
+        ${OPTIONS.map(o=>`<option value="${o}">${o}</option>`).join('')}
+      </select>
+    `;
     editGrid.appendChild(wrap);
   }
 }
 
-function setStatus(txt,ok=true){
-  status.textContent="Status: "+txt;
-  status.style.color = ok?"#9aa0a6":"#ff6b6b";
+// status
+function setStatus(msg, ok=true){
+  status.textContent="Status: "+msg;
+  status.style.color = ok ? "#9aa0a6" : "#ff6b6b";
 }
 
+// simpan kartu ke firebase
 async function saveToFirebase(){
   setStatus("Menyimpan...");
   const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
-  const code = codeInput.value || "1234";
   try{
-    await set(dbRef,{code,cards});
+    await set(configRef,{
+      code: codeInput.value || "1234",
+      cards
+    });
     setStatus("Tersimpan ✓");
-  }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
+  }catch(err){
+    setStatus("Error: "+err.message,false);
+  }
 }
 
+// load config kartu
 async function loadFromFirebase(){
   setStatus("Memuat...");
   try{
-    const snap = await get(dbRef);
+    const snap = await get(configRef);
     if(snap.exists()){
       const data = snap.val();
-      codeInput.value = data.code||"1234";
-      const cards = data.cards||[];
-      Array.from(editGrid.querySelectorAll("select")).forEach((s,i)=>{
-        if(cards[i]) s.value = cards[i];
+      codeInput.value = data.code || "1234";
+      const cards = data.cards || [];
+      Array.from(editGrid.querySelectorAll("select")).forEach((elm,i)=>{
+        if(cards[i]) elm.value = cards[i];
       });
       setStatus("Data dimuat ✓");
-    }else{setStatus("Belum ada data");}
-  }catch(err){console.error(err); setStatus("Gagal: "+err.message,false);}
+    }
+  }catch(err){ setStatus("Error: "+err.message,false); }
 }
 
-// Load histori user
-function loadHistory(){
+// render pagination
+function renderPagination(){
+  pagination.innerHTML="";
+  const totalPages = Math.ceil(historyData.length / perPage);
+  if(totalPages <= 1) return;
+
+  for(let i=1;i<=totalPages;i++){
+    const btn=document.createElement("button");
+    btn.textContent = "Bagian "+i;
+    btn.className="page-btn"+(i===currentPage?" active":"");
+    btn.onclick=()=>{ currentPage=i; renderTable(); renderPagination(); };
+    pagination.appendChild(btn);
+  }
+}
+
+// render tabel histori
+function renderTable(){
   historyBody.innerHTML="";
-  onValue(usedRef,(snap)=>{
-    const data = snap.exists() ? snap.val() : {};
-    const arr = Object.entries(data).sort((a,b)=> b[1].time - a[1].time); // terbaru di atas
-    if(arr.length===0){
-      historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
-      return;
+  if(historyData.length===0){
+    historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
+    return;
+  }
+
+  const start = (currentPage-1)*perPage;
+  const pageData = historyData.slice(start, start+perPage);
+
+  pageData.forEach(([code,obj])=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML+=`<td>${code}</td>`;
+
+    const cards = obj.cards || [];
+    for(let i=0;i<9;i++){
+      tr.innerHTML+=`<td>${cards[i]||"-"}</td>`;
     }
-    historyBody.innerHTML="";
-    arr.forEach(([code,obj])=>{
-      const tr = document.createElement("tr");
-      const tdCode=document.createElement("td"); tdCode.textContent=code; tr.appendChild(tdCode);
-      const cardsArr = obj.cards || [];
-      for(let i=0;i<9;i++){
-        const td=document.createElement("td");
-        td.textContent = cardsArr[i] || "-";
-        tr.appendChild(td);
-      }
-      const tdTime=document.createElement("td");
-      tdTime.textContent = obj.time ? new Date(obj.time).toLocaleString() : "-";
-      tr.appendChild(tdTime);
-      const tdStatus=document.createElement("td");
-      tdStatus.textContent = (obj.cards && obj.cards.some(c=>c)) ? "Sudah dipakai":"Belum dipakai";
-      tdStatus.className = (tdStatus.textContent==="Sudah dipakai") ? "used-yes":"used-no";
-      tr.appendChild(tdStatus);
-      historyBody.appendChild(tr);
-    });
+
+    tr.innerHTML+=`
+      <td>${obj.time ? new Date(obj.time).toLocaleString() : "-"}</td>
+      <td class="${obj.used ? 'used-yes':'used-no'}">
+        ${obj.used ? 'Sudah digunakan' : 'Belum digunakan'}
+      </td>
+    `;
+
+    historyBody.appendChild(tr);
   });
 }
 
+// load histori dari firebase
+onValue(usedRef,(snap)=>{
+  if(!snap.exists()){
+    historyData=[];
+    renderTable();
+    renderPagination();
+    return;
+  }
+
+  // convert ke array dan sort terbaru → atas
+  historyData = Object.entries(snap.val()).sort((a,b)=> b[1].time - a[1].time);
+
+  currentPage = 1;
+
+  renderTable();
+  renderPagination();
+});
+
+// init
 buildGrid();
 loadFromFirebase();
-loadHistory();
 
 saveBtn.addEventListener("click",saveToFirebase);
 refreshBtn.addEventListener("click",loadFromFirebase);

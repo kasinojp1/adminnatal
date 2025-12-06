@@ -26,9 +26,7 @@ td{background:#0b0b0b;color:#fff;}
 .used-yes{color:#4caf50;font-weight:600;}
 .used-no{color:#ff6b6b;font-weight:600;}
 
-.pagination{
-  margin-top:20px;text-align:center;
-}
+.pagination{margin-top:20px;text-align:center;}
 .page-btn{
   background:#222;color:#d4af37;border:1px solid #444;padding:8px 12px;margin:3px;border-radius:6px;cursor:pointer;
 }
@@ -36,7 +34,6 @@ td{background:#0b0b0b;color:#fff;}
   background:#d4af37;color:#000;font-weight:700;
 }
 
-/* responsive */
 @media (max-width:720px){
   .grid{grid-template-columns:repeat(2,1fr);}
 }
@@ -116,13 +113,20 @@ const historyBody = document.getElementById("historyBody");
 const pagination = document.getElementById("pagination");
 const status = document.getElementById("status");
 
-const OPTIONS = const OPTIONS = ["Platinum","Diamond","Super Diamond","Perfect Diamond","Garlic Diamond"];
+// >>>>>>>>>>>>>>>> UPDATE DI SINI <<<<<<<<<<<<<<<<
+const OPTIONS = [
+  "Platinum",
+  "Diamond",
+  "Super Diamond",
+  "Perfect Diamond",
+  "Garlic Diamond"
+];
+// >>>>>>>>>>>>>>>> END UPDATE <<<<<<<<<<<<<<<<
 
 let historyData = [];
 let currentPage = 1;
 const perPage = 10;
 
-// buat 9 kartu
 function buildGrid(){
   editGrid.innerHTML="";
   for(let i=0;i<9;i++){
@@ -138,13 +142,11 @@ function buildGrid(){
   }
 }
 
-// status
 function setStatus(msg, ok=true){
   status.textContent="Status: "+msg;
   status.style.color = ok ? "#9aa0a6" : "#ff6b6b";
 }
 
-// simpan kartu ke firebase
 async function saveToFirebase(){
   setStatus("Menyimpan...");
   const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
@@ -159,7 +161,6 @@ async function saveToFirebase(){
   }
 }
 
-// load config kartu
 async function loadFromFirebase(){
   setStatus("Memuat...");
   try{
@@ -176,7 +177,6 @@ async function loadFromFirebase(){
   }catch(err){ setStatus("Error: "+err.message,false); }
 }
 
-// render pagination
 function renderPagination(){
   pagination.innerHTML="";
   const totalPages = Math.ceil(historyData.length / perPage);
@@ -191,7 +191,6 @@ function renderPagination(){
   }
 }
 
-// render tabel histori
 function renderTable(){
   historyBody.innerHTML="";
   if(historyData.length===0){
@@ -221,7 +220,6 @@ function renderTable(){
   historyBody.scrollIntoView({behavior:'smooth'});
 }
 
-// load histori dari firebase
 onValue(usedRef,(snap)=>{
   if(!snap.exists()){
     historyData=[];
@@ -230,12 +228,11 @@ onValue(usedRef,(snap)=>{
     return;
   }
 
-  // convert ke array dan sort terbaru → atas
   historyData = Object.entries(snap.val())
     .sort((a,b)=>{
       const t1 = a[1].time || 0;
       const t2 = b[1].time || 0;
-      return t2 - t1; // terbaru di atas
+      return t2 - t1;
     });
 
   currentPage = 1;
@@ -243,7 +240,6 @@ onValue(usedRef,(snap)=>{
   renderPagination();
 });
 
-// init
 buildGrid();
 loadFromFirebase();
 

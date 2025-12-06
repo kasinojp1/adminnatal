@@ -68,11 +68,11 @@ td{background:#0b0b0b;color:#fff;}
   <h2>Login Super Admin</h2>
   <input type="text" id="username" placeholder="Username"/>
   <input type="password" id="password" placeholder="Password"/>
-  <button class="login-btn" onclick="login()">Masuk</button>
+  <button class="login-btn" id="loginBtn">Masuk</button>
   <div id="loginError" class="error"></div>
 </div>
 
-<!-- ADMIN PANEL -->
+<!-- PANEL ADMIN -->
 <div id="adminPanel" class="panel">
 <h1>Admin Panel Kasinojp - Set Kartu & Histori</h1>
 
@@ -116,6 +116,23 @@ td{background:#0b0b0b;color:#fff;}
 
 </div>
 
+<!-- LOGIN SCRIPT (NON-MODULE AGAR 100% BERJALAN) -->
+<script>
+document.getElementById("loginBtn").addEventListener("click", function(){
+  const user = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value.trim();
+  const error = document.getElementById("loginError");
+
+  if(user === "superadmin" && pass === "asd123"){
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("adminPanel").style.display="block";
+  } else {
+    error.textContent = "Username atau password salah!";
+  }
+});
+</script>
+
+<!-- FIREBASE SCRIPT -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
@@ -147,20 +164,6 @@ const pagination = document.getElementById("pagination");
 const status = document.getElementById("status");
 
 const OPTIONS = ["Platinum","Diamond","Super Diamond","Perfect Diamond","Garlic Diamond"];
-
-/* LOGIN FUNCTION */
-function login(){
-  const user = document.getElementById("username").value.trim();
-  const pass = document.getElementById("password").value.trim();
-  const error = document.getElementById("loginError");
-
-  if(user === "superadmin" && pass === "asd123"){
-    document.getElementById("loginBox").style.display="none";
-    document.getElementById("adminPanel").style.display="block";
-  } else {
-    error.textContent = "Username atau password salah!";
-  }
-}
 
 /* BUILD GRID */
 function buildGrid(){

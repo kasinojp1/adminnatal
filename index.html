@@ -9,8 +9,28 @@
 body{
   margin:0;font-family:Inter,Poppins,sans-serif;background:#0b0b0b;color:#eee;display:flex;justify-content:center;padding:20px;
 }
+
+/* PANEL LOGIN */
+.login-box{
+  width:100%;max-width:420px;background:#111;padding:25px;border-radius:12px;
+  border:1px solid rgba(212,175,55,0.15);margin-top:80px;text-align:center;
+}
+.login-box h2{color:#d4af37;margin-bottom:20px;}
+.login-box input{
+  width:100%;padding:10px;margin:8px 0;background:#0b1114;color:#fff;
+  border-radius:8px;border:1px solid #333;
+}
+.login-btn{
+  width:100%;padding:12px;background:#d4af37;color:#111;border:none;
+  border-radius:8px;font-weight:600;margin-top:10px;cursor:pointer;
+}
+.error{color:#ff6b6b;margin-top:10px;}
+
+/* PANEL ADMIN */
 .panel{
-  width:100%;max-width:1100px;background:#111;padding:20px;border-radius:12px;border:1px solid rgba(212,175,55,0.1);
+  display:none;
+  width:100%;max-width:1100px;background:#111;padding:20px;border-radius:12px;
+  border:1px solid rgba(212,175,55,0.1);
 }
 h1{color:#d4af37;margin-bottom:10px;}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
@@ -26,7 +46,9 @@ td{background:#0b0b0b;color:#fff;}
 .used-yes{color:#4caf50;font-weight:600;}
 .used-no{color:#ff6b6b;font-weight:600;}
 
-.pagination{margin-top:20px;text-align:center;}
+.pagination{
+  margin-top:20px;text-align:center;
+}
 .page-btn{
   background:#222;color:#d4af37;border:1px solid #444;padding:8px 12px;margin:3px;border-radius:6px;cursor:pointer;
 }
@@ -41,7 +63,17 @@ td{background:#0b0b0b;color:#fff;}
 </head>
 <body>
 
-<div class="panel">
+<!-- LOGIN PAGE -->
+<div id="loginBox" class="login-box">
+  <h2>Login Super Admin</h2>
+  <input type="text" id="username" placeholder="Username"/>
+  <input type="password" id="password" placeholder="Password"/>
+  <button class="login-btn" onclick="login()">Masuk</button>
+  <div id="loginError" class="error"></div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="panel">
 <h1>Admin Panel Kasinojp - Set Kartu & Histori</h1>
 
 <label>Kode Akses Admin:</label>
@@ -88,6 +120,7 @@ td{background:#0b0b0b;color:#fff;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
+/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyDlpuf_uIlpmr2ybAqpJ2GTTRW-t86PGf0",
   authDomain: "hadiahnatal-a033b.firebaseapp.com",
@@ -113,20 +146,23 @@ const historyBody = document.getElementById("historyBody");
 const pagination = document.getElementById("pagination");
 const status = document.getElementById("status");
 
-// >>>>>>>>>>>>>>>> UPDATE DI SINI <<<<<<<<<<<<<<<<
-const OPTIONS = [
-  "Platinum",
-  "Diamond",
-  "Super Diamond",
-  "Perfect Diamond",
-  "Garlic Diamond"
-];
-// >>>>>>>>>>>>>>>> END UPDATE <<<<<<<<<<<<<<<<
+const OPTIONS = ["Platinum","Diamond","Super Diamond","Perfect Diamond","Garlic Diamond"];
 
-let historyData = [];
-let currentPage = 1;
-const perPage = 10;
+/* LOGIN FUNCTION */
+function login(){
+  const user = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value.trim();
+  const error = document.getElementById("loginError");
 
+  if(user === "superadmin" && pass === "asd123"){
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("adminPanel").style.display="block";
+  } else {
+    error.textContent = "Username atau password salah!";
+  }
+}
+
+/* BUILD GRID */
 function buildGrid(){
   editGrid.innerHTML="";
   for(let i=0;i<9;i++){
@@ -147,35 +183,42 @@ function setStatus(msg, ok=true){
   status.style.color = ok ? "#9aa0a6" : "#ff6b6b";
 }
 
+/* SAVE FIREBASE */
 async function saveToFirebase(){
   setStatus("Menyimpan...");
   const cards = Array.from(editGrid.querySelectorAll("select")).map(s=>s.value);
+
   try{
-    await set(configRef,{
-      code: codeInput.value || "1234",
-      cards
-    });
+    await set(configRef,{ code: codeInput.value || "1234", cards });
     setStatus("Tersimpan ✓");
   }catch(err){
     setStatus("Error: "+err.message,false);
   }
 }
 
+/* LOAD FIREBASE */
 async function loadFromFirebase(){
   setStatus("Memuat...");
   try{
     const snap = await get(configRef);
     if(snap.exists()){
-      const data = snap.val();
+      const data=snap.val();
       codeInput.value = data.code || "1234";
       const cards = data.cards || [];
       Array.from(editGrid.querySelectorAll("select")).forEach((elm,i)=>{
         if(cards[i]) elm.value = cards[i];
       });
-      setStatus("Data dimuat ✓");
     }
-  }catch(err){ setStatus("Error: "+err.message,false); }
+    setStatus("Data dimuat ✓");
+  }catch(err){
+    setStatus("Error: "+err.message,false);
+  }
 }
+
+/* PAGINATION + TABLE */
+let historyData=[];
+let currentPage = 1;
+const perPage = 10;
 
 function renderPagination(){
   pagination.innerHTML="";
@@ -184,7 +227,7 @@ function renderPagination(){
 
   for(let i=1;i<=totalPages;i++){
     const btn=document.createElement("button");
-    btn.textContent = "Bagian "+i;
+    btn.textContent="Bagian "+i;
     btn.className="page-btn"+(i===currentPage?" active":"");
     btn.onclick=()=>{ currentPage=i; renderTable(); renderPagination(); };
     pagination.appendChild(btn);
@@ -193,58 +236,52 @@ function renderPagination(){
 
 function renderTable(){
   historyBody.innerHTML="";
+
   if(historyData.length===0){
     historyBody.innerHTML="<tr><td colspan='12'>Belum ada histori</td></tr>";
     return;
   }
 
-  const start = (currentPage-1)*perPage;
-  const pageData = historyData.slice(start, start+perPage);
+  const start=(currentPage-1)*perPage;
+  const pageData=historyData.slice(start,start+perPage);
 
   pageData.forEach(([code,obj])=>{
     const tr=document.createElement("tr");
     tr.innerHTML+=`<td>${code}</td>`;
-    const cards = obj.cards || [];
+    const cards=obj.cards||[];
     for(let i=0;i<9;i++){
       tr.innerHTML+=`<td>${cards[i]||"-"}</td>`;
     }
     tr.innerHTML+=`
       <td>${obj.time ? new Date(obj.time).toLocaleString() : "-"}</td>
-      <td class="${obj.used ? 'used-yes':'used-no'}">
-        ${obj.used ? 'Sudah digunakan' : 'Belum digunakan'}
-      </td>
+      <td class="${obj.used ? 'used-yes':'used-no'}">${obj.used ? 'Sudah digunakan' : 'Belum digunakan'}</td>
     `;
     historyBody.appendChild(tr);
   });
-
-  historyBody.scrollIntoView({behavior:'smooth'});
 }
 
 onValue(usedRef,(snap)=>{
   if(!snap.exists()){
     historyData=[];
-    renderTable();
-    renderPagination();
+    renderTable(); renderPagination();
     return;
   }
 
   historyData = Object.entries(snap.val())
-    .sort((a,b)=>{
-      const t1 = a[1].time || 0;
-      const t2 = b[1].time || 0;
-      return t2 - t1;
-    });
+    .sort((a,b)=> (b[1].time||0) - (a[1].time||0));
 
-  currentPage = 1;
+  currentPage=1;
   renderTable();
   renderPagination();
 });
 
+/* INIT */
 buildGrid();
 loadFromFirebase();
 
 saveBtn.addEventListener("click",saveToFirebase);
 refreshBtn.addEventListener("click",loadFromFirebase);
+
 </script>
 </body>
 </html>
